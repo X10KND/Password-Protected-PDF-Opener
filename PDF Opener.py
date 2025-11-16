@@ -1,20 +1,23 @@
 import os
+import fitz
+import math
 import string
-import pikepdf
 from multiprocessing import Pool
 
-found = False
 filename = "test.pdf"
+
+pdf_document = fitz.open(filename)
 
 PREFIX = ""
 SUFFIX = ""
 
-length = 4
+length = 6
 
 small_letters = False
 capital_letters = False
 numbers = True
 spaces = False
+
 
 def combomaker(options, depth, prefix, suffix, past, arr):
     for i in options:
@@ -23,22 +26,13 @@ def combomaker(options, depth, prefix, suffix, past, arr):
         elif depth == 1:
             arr.append(prefix + past + str(i) + suffix)
 
-    return arr
 
 def unlock(password):
-    
-    global found, filename
-    if found:
-        return False, None
-    try:
-        pdf = pikepdf.open(f"{filename}", password=f"{password}")
-        pdf.save(f"unlocked_{filename}")
-        found = True
-        return True, password
-    except:
-        pass
-
-    return False, None
+    if pdf_document.authenticate(password):
+        pdf_document.save(f"unlocked_{filename}")
+        pdf_document.close()
+        return password
+    return False
 
 
 if __name__ == '__main__':
@@ -56,15 +50,16 @@ if __name__ == '__main__':
 
     if spaces:
         options += " "
-        
-    passwords = combomaker(options, length, PREFIX, SUFFIX, "", [])
+    
+    passwords = []
+    combomaker(options, length, PREFIX, SUFFIX, "", passwords)
     print(f"{len(passwords)} combinations")
+    print(f"10^{round(math.log(len(passwords), 10))} combinations")
 
     if os.path.isfile(filename):
-        with Pool() as pool:
+        with Pool(processes=16) as pool:
             result = pool.imap_unordered(unlock, passwords)
-            for condition, p in result:
-                if condition:
+            for p in result:
+                if p:
                     print(f"Password {p}")
                     break
-
